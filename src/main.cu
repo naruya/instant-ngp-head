@@ -64,12 +64,20 @@ Eigen::Matrix<float, 3, 4> convertToMatrix(const std::string& input) {
 
 void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
     Eigen::Matrix<float, 3, 4> mat = convertToMatrix(msg->get_payload());
-
-    core.m_camera = mat;
-    core.m_recorder->m_video_mode = rta::VideoType::Floating;
-    core.m_recorder->dump_frame_buffer();
     // std::cout << msg->get_payload() << std::endl;
     // std::cout << core.m_camera << std::endl;
+
+    // ref: rta::Recorder::video()
+    core.m_recorder->m_ngp->m_target_deform_frame = core.m_recorder->m_index_frame;
+    core.m_recorder->m_ngp->m_nerf.extra_dim_idx_for_inference = core.m_recorder->m_index_frame;
+    core.m_recorder->m_dst_folder = "floating";
+
+    // ref: rta::Recorder::start()
+    core.m_dynamic_res = false;
+
+    core.m_camera = mat;
+    core.m_zoom = 5.f;
+    core.m_recorder->dump_frame_buffer();
 }
 
 void start_server() {
@@ -289,8 +297,10 @@ int main(int argc, char **argv) {
 #ifndef NGP_GUI
         gui = false;
 #endif
-        auto W = width_flag ? get(width_flag) : 1024;
-        auto H = height_flag ? get(height_flag) : 1024;
+        // auto W = width_flag ? get(width_flag) : 1024;
+        // auto H = height_flag ? get(height_flag) : 1024;
+        auto W = 800;
+        auto H = 800;
 
         if (gui) {
             core.init_window(W, H);
