@@ -35,7 +35,8 @@ static constexpr const char *VideoModeStr = "Floating\0Vertical\0Horizontal\0Ove
 using namespace Eigen;
 namespace fs = filesystem;
 
-static void save_rgba(const std::vector<Eigen::Array4f> &rgba_cpu, const char *path, const char *name, Eigen::Vector2i res3d, std::function<float(float)> transform) {
+// static void save_rgba(const std::vector<Eigen::Array4f> &rgba_cpu, const char *path, const char *name, Eigen::Vector2i res3d, std::function<float(float)> transform) {
+std::vector<uint8_t> save_rgba(const std::vector<Eigen::Array4f> &rgba_cpu, const char *path, const char *name, Eigen::Vector2i res3d, std::function<float(float)> transform) {
     uint32_t w = res3d.x();
     uint32_t h = res3d.y();
 
@@ -54,9 +55,11 @@ static void save_rgba(const std::vector<Eigen::Array4f> &rgba_cpu, const char *p
         }
     }
     // write slice
-    filesystem::path output(path);
-    output = output / (std::string(name) + ".png");
-    stbi_write_png(output.str().c_str(), w, h, 4, pngpixels.data(), w * 4);
+    // filesystem::path output(path);
+    // output = output / (std::string(name) + ".png");
+    // stbi_write_png(output.str().c_str(), w, h, 4, pngpixels.data(), w * 4);
+    // billboards
+    return pngpixels;
 }
 
 rta::Recorder::Recorder(ngp::Testbed *ngp) : m_ngp(ngp) {
@@ -296,7 +299,9 @@ void rta::Recorder::set_camera_to_training_view(size_t index) {
     m_ngp->set_camera_to_training_view(index);
 }
 
-void rta::Recorder::dump_frame_buffer(std::string suffix) {
+// billboards
+// void rta::Recorder::dump_frame_buffer(std::string suffix) {
+std::vector<uint8_t> rta::Recorder::dump_frame_buffer(std::string suffix) {
     auto *core = (rta::Core *) m_ngp;
     auto &render_buffer = m_ngp->m_render_surfaces.front();
     Vector2i res = render_buffer.in_resolution();
@@ -333,7 +338,7 @@ void rta::Recorder::dump_frame_buffer(std::string suffix) {
     Matrix4f C = Matrix4f::Identity();
     C.block<3, 4>(0, 0) = core->m_camera;
     C.block<3, 1>(0, 3) -= Vector3f::Constant(0.5f);
-//    frame.transform_matrix = C.inverse();
+    // frame.transform_matrix = C.inverse();
     frame.transform_matrix = C;
 
     frame.exp_path = "flame/exp/" + id + ".txt";
@@ -347,15 +352,21 @@ void rta::Recorder::dump_frame_buffer(std::string suffix) {
     std::function<float(float)> func = [](float c) { return c; };
     if (core->m_render_mode == ngp::ERenderMode::Normals)
         func = srgb_to_linear;
-    save_rgba(rgba_pred_cpu, dir.str().c_str(), id.c_str(), res, func);
+    // save_rgba(rgba_pred_cpu, dir.str().c_str(), id.c_str(), res, func);
+    std::vector<uint8_t> rgbapixels = save_rgba(rgba_pred_cpu, dir.str().c_str(), id.c_str(), res, func);
 
-    if (m_save_depth) {
-        save_depth(render_buffer.depth_buffer(), dir.str().c_str(), id.c_str(), render_buffer.in_resolution());
-    }
+    // if (m_save_depth) {
+    //     save_depth(render_buffer.depth_buffer(), dir.str().c_str(), id.c_str(), render_buffer.in_resolution());
+    // }
 
     m_ngp->reset_accumulation();
     m_index_frame++;
     m_average_time += m_current_fps;
+    if (m_index_frame >= m_to_record) {
+        m_index_frame = 0;
+    }
+
+    return rgbapixels;
 }
 
 void rta::Recorder::create_folder() {

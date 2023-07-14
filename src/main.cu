@@ -31,6 +31,7 @@ Contact: insta@tue.mpg.de
 #include <websocketpp/server.hpp>
 #include <sstream>
 #include <vector>
+#include <functional>
 
 using namespace args;
 using namespace ngp;
@@ -41,8 +42,8 @@ namespace fs = ::filesystem;
 
 // billboards
 typedef websocketpp::server<websocketpp::config::asio> server;
-ETestbedMode mode = ETestbedMode::Nerf;
-rta::Core core(mode);
+rta::Core core(ETestbedMode::Nerf);
+server s;
 
 Eigen::Matrix<float, 3, 4> convertToMatrix(const std::string& input) {
     std::stringstream ss(input);
@@ -64,31 +65,35 @@ Eigen::Matrix<float, 3, 4> convertToMatrix(const std::string& input) {
 
 void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
     Eigen::Matrix<float, 3, 4> mat = convertToMatrix(msg->get_payload());
-    // std::cout << msg->get_payload() << std::endl;
-    // std::cout << core.m_camera << std::endl;
 
     // ref: rta::Recorder::video()
     core.m_recorder->m_ngp->m_target_deform_frame = core.m_recorder->m_index_frame;
     core.m_recorder->m_ngp->m_nerf.extra_dim_idx_for_inference = core.m_recorder->m_index_frame;
     core.m_recorder->m_dst_folder = "floating";
+    core.m_recorder->m_to_record = core.m_nerf.training.dataset.n_all_images;
 
     // ref: rta::Recorder::start()
     core.m_dynamic_res = false;
 
     core.m_camera = mat;
     core.m_zoom = 5.f;
-    core.m_recorder->dump_frame_buffer();
+    std::vector<uint8_t> pngpixels = core.m_recorder->dump_frame_buffer();
+    try {
+        s.send(hdl, pngpixels.data(), pngpixels.size(), websocketpp::frame::opcode::binary);
+    } catch (websocketpp::exception const & e) {
+        std::cout << "Error sending message: " << e.what() << std::endl;
+    }
 }
 
-void start_server() {
-    server print_server;
-    print_server.set_message_handler(&on_message);
-    print_server.init_asio();
-    print_server.listen(9003);
-    print_server.start_accept();
-    print_server.run();
+void start_server(server& s) {
+    s.clear_access_channels(websocketpp::log::alevel::all);
+    s.clear_error_channels(websocketpp::log::elevel::all);
+    s.set_message_handler(&on_message);
+    s.init_asio();
+    s.listen(9002);
+    s.start_accept();
+    s.run();
 }
-
 
 int main(int argc, char **argv) {
     ArgumentParser parser{
@@ -311,7 +316,7 @@ int main(int argc, char **argv) {
         core.is_using_gui = gui;
 
         // billboards
-        std::thread server_thread(start_server);
+        std::thread server_thread(start_server, std::ref(s));
 
         // Render/training loop
         while (core.frame()) {

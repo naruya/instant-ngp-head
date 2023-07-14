@@ -73,7 +73,8 @@ public:
     void generate_sweep_cameras();
     void snapshot();
     void render_frontal();
-    void dump_frame_buffer(std::string suffix = "");
+    // void dump_frame_buffer(std::string suffix = "");
+    std::vector<uint8_t> dump_frame_buffer(std::string suffix = "");
     void dump_cameras_json();
     void create_folder();
     void step();
