@@ -348,8 +348,12 @@ target_include_directories(ngp PUBLIC ${NGP_INCLUDE_DIRECTORIES})
 target_link_directories(ngp PUBLIC ${NGP_LINK_DIRECTORIES})
 target_link_libraries(ngp PUBLIC ${NGP_LIBRARIES} tiny-cuda-nn)
 
+# billboards
+find_package(Boost REQUIRED COMPONENTS system)
+find_package(Threads REQUIRED)
 add_executable(rta src/main.cu ${RTA_SRC})
-target_link_libraries(rta PUBLIC ngp ${TORCH_LIBRARIES} ${PYTHON_LIBRARIES})
+target_link_libraries(rta PUBLIC ngp ${TORCH_LIBRARIES} ${PYTHON_LIBRARIES} Boost::system Threads::Threads)
+target_include_directories(rta PRIVATE "/tmp/websocketpp")
 target_compile_options(rta PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${CUDA_NVCC_FLAGS}>)
 target_compile_definitions(rta PUBLIC ${NGP_DEFINITIONS} ${TCNN_DEFINITIONS})
 

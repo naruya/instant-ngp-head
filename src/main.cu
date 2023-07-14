@@ -25,11 +25,62 @@ Contact: insta@tue.mpg.de
 
 #include <filesystem/path.h>
 
+// billboards
+#include <thread>
+#include <websocketpp/config/asio_no_tls.hpp>
+#include <websocketpp/server.hpp>
+#include <sstream>
+#include <vector>
+
 using namespace args;
 using namespace ngp;
 using namespace std;
 using namespace tcnn;
 namespace fs = ::filesystem;
+
+
+// billboards
+typedef websocketpp::server<websocketpp::config::asio> server;
+ETestbedMode mode = ETestbedMode::Nerf;
+rta::Core core(mode);
+
+Eigen::Matrix<float, 3, 4> convertToMatrix(const std::string& input) {
+    std::stringstream ss(input);
+    float value;
+    std::vector<float> values;
+    while (ss >> value) {
+        values.push_back(value);
+        if (ss.peek() == ',')
+            ss.ignore();
+    }
+    Eigen::Matrix<float, 3, 4> result;
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            result(i, j) = values[j * 4 + i];
+        }
+    }
+    return result;
+}
+
+void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
+    Eigen::Matrix<float, 3, 4> mat = convertToMatrix(msg->get_payload());
+
+    core.m_camera = mat;
+    core.m_recorder->m_video_mode = rta::VideoType::Floating;
+    core.m_recorder->dump_frame_buffer();
+    // std::cout << msg->get_payload() << std::endl;
+    // std::cout << core.m_camera << std::endl;
+}
+
+void start_server() {
+    server print_server;
+    print_server.set_message_handler(&on_message);
+    print_server.init_asio();
+    print_server.listen(9003);
+    print_server.start_accept();
+    print_server.run();
+}
+
 
 int main(int argc, char **argv) {
     ArgumentParser parser{
@@ -169,8 +220,8 @@ int main(int argc, char **argv) {
             }
         }
 
-//        Testbed testbed(mode);
-        rta::Core core(mode);
+        // billboards
+        // rta::Core core(mode);
 
         std::string mode_str;
         switch (mode) {
@@ -248,6 +299,9 @@ int main(int argc, char **argv) {
         }
 
         core.is_using_gui = gui;
+
+        // billboards
+        std::thread server_thread(start_server);
 
         // Render/training loop
         while (core.frame()) {
