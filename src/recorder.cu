@@ -44,7 +44,7 @@ std::vector<uint8_t> save_rgba(const std::vector<Eigen::Array4f> &rgba_cpu, cons
     int dst = 0;
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
-            size_t i = x + res3d.x() + y * res3d.x();
+            size_t i = x + y * res3d.x();
             if (i < rgba_cpu.size()) {
                 Eigen::Array4f rgba = rgba_cpu[i];
                 pngpixels[dst++] = (uint8_t) tcnn::clamp(transform(rgba.x()) * 255.f, 0.f, 255.f);

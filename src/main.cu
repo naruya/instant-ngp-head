@@ -65,6 +65,9 @@ Eigen::Matrix<float, 3, 4> convertToMatrix(const std::string& input) {
 
 void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
     Eigen::Matrix<float, 3, 4> mat = convertToMatrix(msg->get_payload());
+    Eigen::Vector3f pos = mat.block<3,1>(0,3);
+    Eigen::Vector3f target(0.5, 0.5, 0.5);
+    float dist = (pos - target).norm();
 
     // ref: rta::Recorder::video()
     core.m_recorder->m_ngp->m_target_deform_frame = core.m_recorder->m_index_frame;
@@ -76,7 +79,7 @@ void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
     core.m_dynamic_res = false;
 
     core.m_camera = mat;
-    core.m_zoom = 5.f;
+    core.m_relative_focal_length << 1.05716 * dist * 2.f, 1.05716 * dist * 2.f;
     std::vector<uint8_t> pngpixels = core.m_recorder->dump_frame_buffer();
     try {
         s.send(hdl, pngpixels.data(), pngpixels.size(), websocketpp::frame::opcode::binary);
